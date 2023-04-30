@@ -16,6 +16,8 @@ CXX = g++ -c
 LD  = gcc
 endif
 
+NVCC = /usr/local/cuda/bin/nvcc
+
 STRIP = $(PREFIX)-strip -s
 
 OBJCOPY = objcopy
@@ -40,17 +42,20 @@ DEBUG_OBJS_CXX = $(addprefix $(OBJS_DIR)/,${CXX_OBJS:.o=.dcppo})
 VERT_OBJS_IN_OBJS = $(addprefix $(OBJS_DIR)/,${VERT_OBJS:.vert=.vo})
 FRAG_OBJS_IN_OBJS = $(addprefix $(OBJS_DIR)/,${FRAG_OBJS:.frag=.fo})
 
-RELEASE_OBJS = $(RELEASE_OBJS_C) $(RELEASE_OBJS_CXX) $(VERT_OBJS_IN_OBJS) $(FRAG_OBJS_IN_OBJS)
-DEBUG_OBJS = $(DEBUG_OBJS_C) $(DEBUG_OBJS_CXX)  $(VERT_OBJS_IN_OBJS) $(FRAG_OBJS_IN_OBJS)
+PTX_OBJS_IN_OBJS  = $(addprefix $(OBJS_DIR)/,${PTX_OBJS})
+PTXO_OBJS_IN_OBJS = $(addprefix $(OBJS_DIR)/,${PTXO_OBJS})
+
+RELEASE_OBJS = $(RELEASE_OBJS_C) $(RELEASE_OBJS_CXX) $(VERT_OBJS_IN_OBJS) $(FRAG_OBJS_IN_OBJS) $(PTXO_OBJS_IN_OBJS)
+DEBUG_OBJS = $(DEBUG_OBJS_C) $(DEBUG_OBJS_CXX)  $(VERT_OBJS_IN_OBJS) $(FRAG_OBJS_IN_OBJS) $(PTXO_OBJS_IN_OBJS)
 
 RELEASE_OUT = $(BIN_DIR)/$(RELEASE_TARGET)
 DEBUG_OUT = $(BIN_DIR)/$(DEBUG_TARGET)
 
 all: release
 
-release : $(RELEASE_OUT)
+release : $(RELEASE_OUT) $(PTX_OBJS_IN_OBJS)
 
-debug : $(DEBUG_OUT)
+debug : $(DEBUG_OUT) $(PTX_OBJS_IN_OBJS)
 
 $(OBJS_DIR)/%.rco: %.c
 	@if [ ! -d $(OBJS_DIR) ]; then \
@@ -81,6 +86,25 @@ $(OBJS_DIR)/%.vo: %.vert
 		mkdir $(OBJS_DIR); \
 	fi;
 	$(OBJCOPY) --readonly-text -I binary -B i386 -O elf64-x86-64 $< $@
+
+$(OBJS_DIR)/%.ptx: %.cu
+	@if [ ! -d $(OBJS_DIR) ]; then \
+		mkdir $(OBJS_DIR); \
+	fi;
+	$(NVCC) -ptx -gencode arch=compute_50,code=compute_50 -o $@ $<
+
+$(OBJS_DIR)/%.ptx: %.cu
+	@if [ ! -d $(OBJS_DIR) ]; then \
+		mkdir $(OBJS_DIR); \
+	fi;
+	$(NVCC) -ptx -gencode arch=compute_50,code=compute_50 -o $@ $<
+
+$(OBJS_DIR)/%.ptxo: %.cu
+	@if [ ! -d $(OBJS_DIR) ]; then \
+		mkdir $(OBJS_DIR); \
+	fi;
+	$(NVCC) -ptx -gencode arch=compute_60,code=compute_60 --threads 0 -o $(patsubst %.ptxo,%.ptx,$@) $<
+	$(OBJCOPY) --readonly-text -I binary -B i386 -O elf64-x86-64 $(patsubst %.ptxo,%.ptx,$@) $@
 
 $(RELEASE_OUT) : $(RELEASE_OBJS)
 	@if [ ! -d $(BIN_DIR) ]; then \
