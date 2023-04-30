@@ -10,10 +10,6 @@
 #define K 2
 #define N 3
 
-struct xorshift {
-    uint32_t state;
-};
-
 static uint32_t xorshitf32(uint32_t *pState){
     uint32_t state = *pState;
     state ^= state << 13;
